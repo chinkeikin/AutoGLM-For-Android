@@ -5,7 +5,7 @@
 
 **Native Android Phone AI Assistant Based on Open-AutoGLM**
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-7.0%2B-green.svg)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9-purple.svg)](https://kotlinlang.org)
 
@@ -349,56 +349,19 @@ fun saveNewSetting(value: String) = prefs.edit().putString(KEY_NEW_SETTING, valu
 
 ## 🔧 FAQ
 
-### Shizuku Related
-
-**Q: Shizuku shows not running?**
-A: 
-1. Make sure Shizuku app is installed and opened
-2. Follow the guide in Shizuku to activate the service
-3. Wireless debugging method is recommended, no Root required
-
-**Q: Shizuku becomes invalid after phone restart?**
-A: 
-- Wireless debugging method requires re-pairing
-- Consider using Root method for permanent activation
-- Or set up auto-start script
-
-### Permission Related
-
-**Q: Cannot grant overlay permission?**
-A: 
-1. Go to System Settings → Apps → AutoGLM → Permissions
-2. Find "Display over other apps" and enable it
-3. Some systems require setting in "Special permissions"
-
-**Q: Cannot enable keyboard?**
-A: 
-1. Go to System Settings → Language & Input → Manage Keyboards
-2. Find "AutoGLM Keyboard" and enable it
-3. No need to set as default keyboard, app will switch automatically
-
-### Execution Related
-
-**Q: Click action not working?**
-A: 
-1. Check if Shizuku is running properly
-2. Some systems require enabling "USB debugging (Security settings)"
-3. Try restarting Shizuku service
-
-**Q: Text input failed?**
-A: 
-1. Make sure AutoGLM Keyboard is enabled
-2. Check if target input field has focus
-3. Check logs to confirm keyboard switching succeeded
-
-**Q: Screenshot shows black screen?**
-A: 
-- This is usually normal protection for sensitive pages (payment, password, etc.)
-- App will automatically detect and mark as sensitive screenshot
+| Question | Solution |
+|----------|----------|
+| **Shizuku shows not running?** | Make sure Shizuku is installed and opened, follow the guide to activate, wireless debugging recommended |
+| **Shizuku invalid after restart?** | Wireless debugging requires re-pairing, consider Root method for permanent activation or set up auto-start script |
+| **Cannot grant overlay permission?** | System Settings → Apps → AutoGLM → Permissions → Enable "Display over other apps" |
+| **Cannot enable keyboard?** | System Settings → Language & Input → Manage Keyboards → Enable AutoGLM Keyboard |
+| **Click action not working?** | Check if Shizuku is running, some systems require "USB debugging (Security settings)", try restarting Shizuku |
+| **Text input failed?** | Make sure AutoGLM Keyboard is enabled, check if target input field has focus |
+| **Screenshot shows black screen?** | Normal protection for sensitive pages (payment, password, etc.), app will auto-detect and mark |
 
 ## 📄 License
 
-This project is licensed under [Apache License 2.0](LICENSE).
+This project is licensed under [MIT License](LICENSE).
 
 ## 🙏 Acknowledgments
 
