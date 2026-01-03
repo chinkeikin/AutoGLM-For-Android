@@ -382,6 +382,9 @@ class FloatingWindowService : Service(), FloatingWindowController {
             Logger.d(TAG, "updateStatus serviceScope.launch executing, status: $status, floatingView: $floatingView")
             currentStatus = status
             
+            // Update foreground notification
+            updateNotification(status)
+            
             // If switching to RUNNING, clear previous steps
             if (status == TaskStatus.RUNNING) {
                 stepsList.clear()
@@ -1132,11 +1135,13 @@ class FloatingWindowService : Service(), FloatingWindowController {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "AutoGLM Agent",
+                getString(R.string.app_name),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Agent execution status"
+                description = getString(R.string.notification_service_running)
                 setShowBadge(false)
+                // Ensure the notification is visible
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
         }
@@ -1145,9 +1150,14 @@ class FloatingWindowService : Service(), FloatingWindowController {
     /**
      * Creates the notification for the foreground service.
      *
+     * @param title Optional title for the notification
+     * @param text Optional text for the notification
      * @return The notification to display
      */
-    private fun createNotification(): Notification {
+    private fun createNotification(
+        title: String = getString(R.string.app_name),
+        text: String = getString(R.string.notification_service_running)
+    ): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java),
@@ -1155,12 +1165,35 @@ class FloatingWindowService : Service(), FloatingWindowController {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("AutoGLM Agent")
-            .setContentText("Agent is running")
-            .setSmallIcon(android.R.drawable.ic_menu_info_details)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSmallIcon(R.drawable.ic_layers)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()
+    }
+    
+    /**
+     * Updates the foreground notification with new status.
+     *
+     * @param status The current task status
+     */
+    private fun updateNotification(status: TaskStatus) {
+        val (title, text) = when (status) {
+            TaskStatus.IDLE -> getString(R.string.app_name) to getString(R.string.notification_service_running)
+            TaskStatus.RUNNING -> getString(R.string.app_name) to getString(R.string.notification_task_running)
+            TaskStatus.PAUSED -> getString(R.string.app_name) to getString(R.string.notification_task_paused)
+            TaskStatus.COMPLETED -> getString(R.string.app_name) to getString(R.string.notification_task_completed)
+            TaskStatus.FAILED -> getString(R.string.app_name) to getString(R.string.notification_task_failed)
+            TaskStatus.WAITING_CONFIRMATION -> getString(R.string.app_name) to getString(R.string.notification_waiting_confirm)
+            TaskStatus.WAITING_TAKEOVER -> getString(R.string.app_name) to getString(R.string.notification_waiting_takeover)
+        }
+        
+        val notification = createNotification(title, text)
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        notificationManager?.notify(NOTIFICATION_ID, notification)
     }
 
     // ==================== Steps Adapter ====================

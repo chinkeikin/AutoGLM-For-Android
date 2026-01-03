@@ -58,7 +58,12 @@ class FloatingWindowToggleActivity : Activity() {
     }
 
     private fun showFloatingWindow() {
-        startService(Intent(this, FloatingWindowService::class.java))
+        val serviceIntent = Intent(this, FloatingWindowService::class.java)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
         Handler(Looper.getMainLooper()).postDelayed({
             FloatingWindowService.getInstance()?.show()
         }, 100)

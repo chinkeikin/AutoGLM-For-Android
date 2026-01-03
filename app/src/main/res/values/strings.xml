@@ -173,6 +173,15 @@
     <string name="tile_floating_window">AutoGLM</string>
     <string name="tile_floating_window_desc">显示/隐藏悬浮窗</string>
     
+    <!-- Foreground Service Notifications -->
+    <string name="notification_service_running">服务运行中</string>
+    <string name="notification_task_running">任务执行中...</string>
+    <string name="notification_task_paused">任务已暂停</string>
+    <string name="notification_task_completed">任务已完成</string>
+    <string name="notification_task_failed">任务执行失败</string>
+    <string name="notification_waiting_confirm">等待确认操作</string>
+    <string name="notification_waiting_takeover">需要手动操作</string>
+    
     <!-- History -->
     <string name="history_title">历史记录</string>
     <string name="history_detail_title">任务详情</string>

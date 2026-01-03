@@ -428,8 +428,13 @@ class MainActivity : AppCompatActivity(), PhoneAgentListener {
             return
         }
 
-        // Start floating window service
-        startService(Intent(this, FloatingWindowService::class.java))
+        // Start floating window service as foreground service
+        val serviceIntent = Intent(this, FloatingWindowService::class.java)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
 
         // Setup callbacks after service starts
         android.os.Handler(mainLooper).postDelayed({
@@ -663,7 +668,12 @@ class MainActivity : AppCompatActivity(), PhoneAgentListener {
         // Start floating window service if overlay permission granted
         if (FloatingWindowService.canDrawOverlays(this)) {
             Logger.d(TAG, "startTask: Starting floating window service")
-            startService(Intent(this, FloatingWindowService::class.java))
+            val serviceIntent = Intent(this, FloatingWindowService::class.java)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
         } else {
             Toast.makeText(this, R.string.toast_overlay_permission_required, Toast.LENGTH_LONG).show()
             FloatingWindowService.requestOverlayPermission(this)
