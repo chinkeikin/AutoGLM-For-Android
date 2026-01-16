@@ -136,8 +136,8 @@ class TaskService : Service() {
             // 在协程中执行：先解锁屏幕，返回桌面，再开始任务
             currentTaskJob = serviceScope.launch {
                 try {
-                    // 1. 唤醒并解锁屏幕
-                    wakeUpAndUnlockScreen()
+                    // 1. 唤醒并解锁屏幕，持续保持屏幕常亮
+                    wakeUpAndKeepScreenOn()
                     
                     // 2. 等待解锁动画完成（1秒）
                     delay(1000)
@@ -148,16 +148,24 @@ class TaskService : Service() {
                     // 4. 等待桌面加载完成（500ms）
                     delay(500)
                     
-                    // 5. 开始执行任务
+                    // 5. 隐藏悬浮窗（AIDL 任务全程不显示悬浮窗）
+                    hideFloatingWindow()
+                    
+                    // 6. 开始执行任务
                     Logger.i(TAG, "IPC: Starting task execution")
                     val result = agent.run(taskDescription)
                     Logger.i(TAG, "IPC: Task completed with result: ${result.success}")
+                    
                 } catch (e: Exception) {
                     Logger.e(TAG, "IPC: Task execution error", e)
                     broadcastToCallbacks {
                         it.onTaskFailed(e.message ?: "Unknown error", agent.getCurrentStepNumber())
                     }
                     broadcastToCallbacks { it.onStatusChanged("FAILED") }
+                    
+                } finally {
+                    // 释放屏幕常亮锁
+                    releaseWakeLock()
                 }
             }
 
@@ -170,6 +178,9 @@ class TaskService : Service() {
             agent?.cancel()
             currentTaskJob?.cancel()
             broadcastToCallbacks { it.onStatusChanged("IDLE") }
+            
+            // 取消任务时释放屏幕常亮锁（不显示悬浮窗）
+            releaseWakeLock()
         }
 
         override fun pauseTask(): Boolean {
@@ -229,34 +240,33 @@ class TaskService : Service() {
         serviceScope.cancel()
         callbacks.kill()
         
-        // 释放 WakeLock
-        wakeLock?.release()
-        wakeLock = null
+        // 释放屏幕常亮锁
+        releaseWakeLock()
     }
 
     /**
-     * 唤醒并解锁屏幕
+     * 唤醒并解锁屏幕，持续保持屏幕常亮
      * 适用于无密码锁屏，唤醒后自动上划解锁
      */
-    private fun wakeUpAndUnlockScreen() {
+    private fun wakeUpAndKeepScreenOn() {
         try {
-            // 1. 唤醒屏幕
+            // 1. 唤醒屏幕并持续保持常亮
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
             
             // 释放之前的 WakeLock（如果有）
-            wakeLock?.release()
+            releaseWakeLock()
             
-            // 创建新的 WakeLock，保持屏幕亮起 30 秒（足够任务启动）
+            // 创建新的 WakeLock，持续保持屏幕常亮（不设置超时时间）
             wakeLock = powerManager.newWakeLock(
                 PowerManager.SCREEN_BRIGHT_WAKE_LOCK or 
                 PowerManager.ACQUIRE_CAUSES_WAKEUP or
                 PowerManager.ON_AFTER_RELEASE,
                 "AutoGLM::TaskWakeLock"
             ).apply {
-                acquire(30_000L) // 30秒后自动释放
+                acquire() // 不设置超时，由任务结束时手动释放
             }
             
-            Logger.i(TAG, "Screen woken up")
+            Logger.i(TAG, "Screen woken up and kept on")
             
             // 2. 启动透明 Activity 来解锁键盘锁
             // UnlockActivity 会处理解锁逻辑然后立即关闭
@@ -269,6 +279,36 @@ class TaskService : Service() {
             
         } catch (e: Exception) {
             Logger.e(TAG, "Failed to wake up and unlock screen", e)
+        }
+    }
+    
+    /**
+     * 隐藏悬浮窗
+     * AIDL 任务全程不显示悬浮窗
+     */
+    private fun hideFloatingWindow() {
+        try {
+            FloatingWindowService.getInstance()?.hide()
+            Logger.i(TAG, "Floating window hidden for IPC task")
+        } catch (e: Exception) {
+            Logger.e(TAG, "Failed to hide floating window", e)
+        }
+    }
+    
+    /**
+     * 释放屏幕常亮锁
+     */
+    private fun releaseWakeLock() {
+        try {
+            wakeLock?.let {
+                if (it.isHeld) {
+                    it.release()
+                    Logger.i(TAG, "WakeLock released")
+                }
+            }
+            wakeLock = null
+        } catch (e: Exception) {
+            Logger.e(TAG, "Failed to release WakeLock", e)
         }
     }
     
