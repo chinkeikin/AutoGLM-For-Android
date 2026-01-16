@@ -165,7 +165,16 @@
             android:name=".voice.ContinuousListeningService"
             android:foregroundServiceType="microphone"
             android:exported="false" />
-        
+
+        <!-- IPC Task Service for cross-process task control -->
+        <service
+            android:name=".ipc.TaskService"
+            android:exported="true"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="com.kevinluo.autoglm.ITaskService" />
+            </intent-filter>
+        </service>
 
     </application>
 
