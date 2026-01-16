@@ -66,7 +66,7 @@ class ComponentManager private constructor(private val context: Context) {
     }
 
     // User service reference - set when Shizuku connects
-    private var userService: IUserService? = null
+    var userService: IUserService? = null
 
     // Lazily initialized components that depend on UserService
     private var deviceExecutorInternal: DeviceExecutor? = null

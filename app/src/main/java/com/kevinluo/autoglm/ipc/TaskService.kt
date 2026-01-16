@@ -12,6 +12,7 @@ import com.kevinluo.autoglm.ITaskOutputCallback
 import com.kevinluo.autoglm.ITaskService
 import com.kevinluo.autoglm.action.AgentAction
 import com.kevinluo.autoglm.agent.PhoneAgentListener
+import com.kevinluo.autoglm.input.KeyboardHelper
 import com.kevinluo.autoglm.ui.FloatingWindowService
 import com.kevinluo.autoglm.ui.TaskStatus
 import com.kevinluo.autoglm.util.Logger
@@ -44,6 +45,7 @@ class TaskService : Service() {
     private var currentTaskJob: Job? = null
     private var currentTaskDescription: String? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private var originalIme: String? = null // 保存原始键盘，任务结束后恢复
 
     // 使用 RemoteCallbackList 管理多个客户端的回调
     private val callbacks = RemoteCallbackList<ITaskOutputCallback>()
@@ -148,10 +150,13 @@ class TaskService : Service() {
                     // 4. 等待桌面加载完成（500ms）
                     delay(500)
                     
-                    // 5. 隐藏悬浮窗（AIDL 任务全程不显示悬浮窗）
+                    // 5. 切换到 AutoGLM Keyboard
+                    switchToAutoGLMKeyboard(componentManager)
+                    
+                    // 6. 隐藏悬浮窗（AIDL 任务全程不显示悬浮窗）
                     hideFloatingWindow()
                     
-                    // 6. 开始执行任务
+                    // 7. 开始执行任务
                     Logger.i(TAG, "IPC: Starting task execution")
                     val result = agent.run(taskDescription)
                     Logger.i(TAG, "IPC: Task completed with result: ${result.success}")
@@ -164,6 +169,9 @@ class TaskService : Service() {
                     broadcastToCallbacks { it.onStatusChanged("FAILED") }
                     
                 } finally {
+                    // 恢复原始键盘
+                    restoreOriginalKeyboard(componentManager)
+                    
                     // 释放屏幕常亮锁
                     releaseWakeLock()
                 }
@@ -174,13 +182,17 @@ class TaskService : Service() {
 
         override fun cancelTask() {
             Logger.i(TAG, "IPC: cancelTask called")
-            val agent = ComponentManager.getInstance(this@TaskService).phoneAgent
+            val componentManager = ComponentManager.getInstance(this@TaskService)
+            val agent = componentManager.phoneAgent
             agent?.cancel()
             currentTaskJob?.cancel()
             broadcastToCallbacks { it.onStatusChanged("IDLE") }
             
-            // 取消任务时释放屏幕常亮锁（不显示悬浮窗）
-            releaseWakeLock()
+            // 取消任务时恢复原始键盘并释放屏幕常亮锁
+            serviceScope.launch {
+                restoreOriginalKeyboard(componentManager)
+                releaseWakeLock()
+            }
         }
 
         override fun pauseTask(): Boolean {
@@ -329,6 +341,96 @@ class TaskService : Service() {
             
         } catch (e: Exception) {
             Logger.e(TAG, "Failed to return to home", e)
+        }
+    }
+    
+    /**
+     * 切换到 AutoGLM Keyboard
+     */
+    private suspend fun switchToAutoGLMKeyboard(componentManager: ComponentManager) {
+        try {
+            val userService = componentManager.userService
+            if (userService == null) {
+                Logger.w(TAG, "UserService not available, cannot switch keyboard")
+                return
+            }
+            
+            // 获取当前键盘
+            val currentIme = executeShellCommand(userService, "settings get secure default_input_method")
+            originalIme = currentIme.lines().firstOrNull { it.isNotBlank() && !it.startsWith("[") }
+            Logger.d(TAG, "Current IME: $originalIme")
+            
+            val imeId = KeyboardHelper.IME_ID
+            
+            // 检查是否已经是 AutoGLM Keyboard
+            if (KeyboardHelper.isAutoGLMKeyboard(originalIme ?: "")) {
+                Logger.i(TAG, "Already using AutoGLM Keyboard")
+                return
+            }
+            
+            // 启用 AutoGLM Keyboard
+            Logger.d(TAG, "Enabling AutoGLM Keyboard: $imeId")
+            executeShellCommand(userService, "ime enable $imeId")
+            delay(300)
+            
+            // 切换到 AutoGLM Keyboard
+            Logger.d(TAG, "Switching to AutoGLM Keyboard")
+            executeShellCommand(userService, "ime set $imeId")
+            delay(500)
+            
+            // 验证切换
+            val newIme = executeShellCommand(userService, "settings get secure default_input_method")
+            val newImeId = newIme.lines().firstOrNull { it.isNotBlank() && !it.startsWith("[") } ?: ""
+            
+            if (KeyboardHelper.isAutoGLMKeyboard(newImeId)) {
+                Logger.i(TAG, "Successfully switched to AutoGLM Keyboard")
+            } else {
+                Logger.w(TAG, "Failed to switch to AutoGLM Keyboard, current: $newImeId")
+            }
+            
+        } catch (e: Exception) {
+            Logger.e(TAG, "Failed to switch to AutoGLM Keyboard", e)
+        }
+    }
+    
+    /**
+     * 恢复原始键盘
+     */
+    private suspend fun restoreOriginalKeyboard(componentManager: ComponentManager) {
+        try {
+            val ime = originalIme
+            if (ime.isNullOrBlank() || ime.contains("null", ignoreCase = true)) {
+                Logger.d(TAG, "No original IME to restore")
+                return
+            }
+            
+            val userService = componentManager.userService
+            if (userService == null) {
+                Logger.w(TAG, "UserService not available, cannot restore keyboard")
+                return
+            }
+            
+            Logger.d(TAG, "Restoring original keyboard: $ime")
+            executeShellCommand(userService, "ime set $ime")
+            delay(300)
+            
+            Logger.i(TAG, "Original keyboard restored")
+            originalIme = null
+            
+        } catch (e: Exception) {
+            Logger.e(TAG, "Failed to restore original keyboard", e)
+        }
+    }
+    
+    /**
+     * 执行 Shell 命令
+     */
+    private fun executeShellCommand(userService: com.kevinluo.autoglm.IUserService, command: String): String {
+        return try {
+            userService.executeCommand(command) ?: ""
+        } catch (e: Exception) {
+            Logger.e(TAG, "Failed to execute shell command: $command", e)
+            ""
         }
     }
 
